@@ -173,7 +173,7 @@ bool BTScan::start(uint32_t duration, void (*scanCompleteCB)(BTScanResults)) {
 
     /* start to discover nearby Bluetooth devices */
     log_i("start to discover nearby Bluetooth devices");
-    esp_bt_gap_start_discovery(ESP_BT_INQ_MODE_GENERAL_INQUIRY, 10, 0);
+    esp_bt_gap_start_discovery(ESP_BT_INQ_MODE_GENERAL_INQUIRY, (uint8_t)round(0.78*duration), 0);
 
 	log_d("<< start()");
 	return true;
