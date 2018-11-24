@@ -37,7 +37,7 @@
 
 
 #include "BTAdvertisedDevice.h"
-//#include "BLEUtils.h"
+//#include "BTUtils.h"
 #ifdef ARDUINO_ARCH_ESP32
 #include "esp32-hal-log.h"
 #endif
@@ -47,7 +47,6 @@
 
 BTAdvertisedDevice::BTAdvertisedDevice() {
 	m_adFlag           = 0;
-	m_appearance       = 0;
 	m_manufacturerData = "";
 	m_name             = "";
 	m_rssi             = -9999;
@@ -57,7 +56,6 @@ BTAdvertisedDevice::BTAdvertisedDevice() {
 	m_txPower          = 0;
 	m_pScan            = nullptr;
 
-	m_haveAppearance       = false;
 	m_haveManufacturerData = false;
 	m_haveName             = false;
 	m_haveRSSI             = false;
@@ -80,19 +78,6 @@ BTAdvertisedDevice::BTAdvertisedDevice() {
 BTAddress BTAdvertisedDevice::getAddress() {
 	return m_address;
 } // getAddress
-
-
-/**
- * @brief Get the appearance.
- *
- * A %BLE device can declare its own appearance.  The appearance is how it would like to be shown to an end user
- * typcially in the form of an icon.
- *
- * @return The appearance of the advertised device.
- */
-uint16_t BTAdvertisedDevice::getAppearance() {
-	return m_appearance;
-} // getAppearance
 
 
 /**
@@ -143,26 +128,25 @@ std::string BTAdvertisedDevice::getServiceData() {
 /**
  * @brief Get the service data UUID.
  * @return The service data UUID.
- 
-BLEUUID BTAdvertisedDevice::getServiceDataUUID() {
+*/
+BTUUID BTAdvertisedDevice::getServiceDataUUID() {
 	return m_serviceDataUUID;
 } // getServiceDataUUID
 
-*/
+
 
 
 /**
  * @brief Check advertised serviced for existence required UUID
  * @return Return true if service is advertised
-
-bool BTAdvertisedDevice::isAdvertisingService(BLEUUID uuid){
+ */
+bool BTAdvertisedDevice::isAdvertisingService(BTUUID uuid){
 	for (int i = 0; i < m_serviceUUIDs.size(); ++i) {
 		if(m_serviceUUIDs[i].equals(uuid))
 			return true;
 	}
 	return false;
 }
- */
 
 /**
  * @brief Get the TX Power.
@@ -184,16 +168,6 @@ std::string BTAdvertisedDevice::getServiceType(){
 std::string BTAdvertisedDevice::getDeviceType(){
 	return m_deviceType;
 }
-
-
-/**
- * @brief Does this advertisement have an appearance value?
- * @return True if there is an appearance value present.
- */
-bool BTAdvertisedDevice::haveAppearance() {
-	return m_haveAppearance;
-} // haveAppearance
-
 
 /**
  * @brief Does this advertisement have manufacturer data?
@@ -265,8 +239,7 @@ bool BTAdvertisedDevice::haveCod() {
  *
  * https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile
  */
-void BTAdvertisedDevice::parseAdvertisement(esp_bt_gap_cb_param_t::disc_res_param* disc_res) {
-
+void BTAdvertisedDevice::parseDiscResult(esp_bt_gap_cb_param_t::disc_res_param* disc_res) {
 
     esp_bt_gap_dev_prop_t *p;
 
@@ -303,6 +276,12 @@ void BTAdvertisedDevice::parseAdvertisement(esp_bt_gap_cb_param_t::disc_res_para
 			}
 			case ESP_BT_GAP_DEV_PROP_EIR: {
 				memcpy(eir, (uint8_t *)(p->val), p->len);
+				//parseEir((uint8_t*)p->val);
+				
+				//#ifndef WiFi_h //wait for Arduino IDF update to properly work with wifi > https://github.com/espressif/arduino-esp32/issues/1997
+				parseEir(eir);
+				//#endif
+				
 				eir_len = p->len;
 				break;
 			}
@@ -331,6 +310,92 @@ void BTAdvertisedDevice::parseAdvertisement(esp_bt_gap_cb_param_t::disc_res_para
 
 
 
+} // parseDiscResult
+
+void BTAdvertisedDevice::parseEir(uint8_t* payload) {
+	uint8_t length;
+	uint8_t eir_type;
+	uint8_t sizeConsumed = 0;
+	bool finished = false;
+	setPayload(payload);
+
+	while(!finished) {
+		length = *payload;          // Retrieve the length of the record.
+		payload++;                  // Skip to type
+		sizeConsumed += 1 + length; // increase the size consumed.
+
+		if (length != 0) { // A length of 0 indicates that we have reached the end.
+			eir_type = *payload;
+			payload++;
+			length--;
+
+			char* pHex = BTUtils::buildHexData(nullptr, payload, length);
+			log_d("Type: 0x%.2x (%s), length: %d, data: %s",
+					eir_type, BTUtils::eirTypeToString(eir_type), length, pHex);
+			free(pHex);
+
+			switch(eir_type) {
+				case ESP_BT_EIR_TYPE_SHORT_LOCAL_NAME: {   // eir Data Type: 0x08
+					setName(std::string(reinterpret_cast<char*>(payload), length));
+					break;
+				} // ESP_BT_EIR_TYPE_SHORT_LOCAL_NAME
+
+				case ESP_BT_EIR_TYPE_CMPL_LOCAL_NAME: {   // eir Data Type: 0x09
+					setName(std::string(reinterpret_cast<char*>(payload), length));
+					break;
+				} // ESP_BT_EIR_TYPE_CMPL_LOCAL_NAME
+
+				case ESP_BT_EIR_TYPE_TX_POWER_LEVEL: {      
+					setTXPower(*payload);
+					break;
+				} // ESP_BLE_AD_TYPE_TX_PWR
+
+				case ESP_BT_EIR_TYPE_INCMPL_16BITS_UUID :
+				case ESP_BT_EIR_TYPE_CMPL_16BITS_UUID: {   
+					for (int var = 0; var < length/2; ++var) {
+						setServiceUUID(BTUUID(*reinterpret_cast<uint16_t*>(payload+var*2)));
+					}
+					break;
+				} // ESP_BLE_AD_TYPE_16SRV_PART
+
+				case ESP_BT_EIR_TYPE_INCMPL_32BITS_UUID:
+				case ESP_BT_EIR_TYPE_CMPL_32BITS_UUID: {  
+					for (int var = 0; var < length/4; ++var) {
+						setServiceUUID(BTUUID(*reinterpret_cast<uint32_t*>(payload+var*4)));
+					}
+					break;
+				} // ESP_BLE_AD_TYPE_32SRV_PART
+
+				case ESP_BT_EIR_TYPE_INCMPL_128BITS_UUID: { // Adv Data Type: 0x07
+					setServiceUUID(BTUUID(payload, 16, false));
+					break;
+				} // ESP_BT_EIR_TYPE_INCMPL_128BITS_UUID
+
+				case ESP_BT_EIR_TYPE_CMPL_128BITS_UUID: { // Adv Data Type: 0x06
+					setServiceUUID(BTUUID(payload, 16, false));
+					break;
+				} // ESP_BT_EIR_TYPE_CMPL_128BITS_UUID
+
+				// See CSS Part A 1.4 Manufacturer Specific Data
+				case ESP_BT_EIR_TYPE_MANU_SPECIFIC: {
+					//setManufacturerData(std::string(reinterpret_cast<char*>(payload), length));
+					break;
+				} // ESP_BT_EIR_TYPE_MANU_SPECIFIC
+
+				
+				default: {
+					log_d("Unhandled type: eirType: %d - 0x%.2x", eir_type, eir_type);
+					break;
+				}
+			} // switch
+			payload += length;
+		} // Length <> 0
+
+
+		if (sizeConsumed >=31 || length == 0) {
+			finished = true;
+		}
+	} // !finished
 } // parseAdvertisement
 
 bool BTAdvertisedDevice::get_name_from_eir(uint8_t *eir, uint8_t *bdname, uint8_t *bdname_len)
@@ -374,7 +439,6 @@ void BTAdvertisedDevice::setAddress(BTAddress address) {
 	m_address = address;
 } // setAddress
 
-
 /**
  * @brief Set the adFlag for this device.
  * @param [in] The discovered adFlag.
@@ -385,17 +449,6 @@ void BTAdvertisedDevice::setAdFlag(uint8_t adFlag) {
 
 
 /**
- * @brief Set the appearance for this device.
- * @param [in] The discovered appearance.
- */
-void BTAdvertisedDevice::setAppearance(uint16_t appearance) {
-	m_appearance     = appearance;
-	m_haveAppearance = true;
-	log_d("- appearance: %d", m_appearance);
-} // setAppearance
-
-
-/**
  * @brief Set the manufacturer data for this device.
  * @param [in] The discovered manufacturer data.
  */
@@ -403,7 +456,7 @@ void BTAdvertisedDevice::setAppearance(uint16_t appearance) {
 void BTAdvertisedDevice::setManufacturerData(std::string manufacturerData) {
 	m_manufacturerData     = manufacturerData;
 	m_haveManufacturerData = true;
-	char* pHex = BLEUtils::buildHexData(nullptr, (uint8_t*)m_manufacturerData.data(), (uint8_t)m_manufacturerData.length());
+	char* pHex = BTUtils::buildHexData(nullptr, (uint8_t*)m_manufacturerData.data(), (uint8_t)m_manufacturerData.length());
 	log_d("- manufacturer data: %s", pHex);
 	free(pHex);
 } // setManufacturerData
@@ -458,22 +511,21 @@ void BTAdvertisedDevice::setCod(uint32_t cod) {
 /**
  * @brief Set the Service UUID for this device.
  * @param [in] serviceUUID The discovered serviceUUID
-
-void BLEAdvertisedDevice::setServiceUUID(const char* serviceUUID) {
-	return setServiceUUID(BLEUUID(serviceUUID));
-} // setServiceUUID
  */
+void BTAdvertisedDevice::setServiceUUID(const char* serviceUUID) {
+	return setServiceUUID(BTUUID(serviceUUID));
+} // setServiceUUID
+
 
 /**
  * @brief Set the Service UUID for this device.
  * @param [in] serviceUUID The discovered serviceUUID
- 
-void BLEAdvertisedDevice::setServiceUUID(BLEUUID serviceUUID) {
+ */
+void BTAdvertisedDevice::setServiceUUID(BTUUID serviceUUID) {
 	m_serviceUUIDs.push_back(serviceUUID);
 	m_haveServiceUUID = true;
-	ESP_LOGD(LOG_TAG, "- addServiceUUID(): serviceUUID: %s", serviceUUID.toString().c_str());
+	log_d("- addServiceUUID(): serviceUUID: %s", serviceUUID.toString().c_str());
 } // setServiceUUID
- */
 
 /**
  * @brief Set the ServiceData value.
@@ -489,7 +541,7 @@ void BTAdvertisedDevice::setServiceData(std::string serviceData) {
  * @brief Set the ServiceDataUUID value.
  * @param [in] data ServiceDataUUID value.
 
-void BLEAdvertisedDevice::setServiceDataUUID(BLEUUID uuid) {
+void BLEAdvertisedDevice::setServiceDataUUID(BTUUID uuid) {
 	m_haveServiceData = true;         // Set the flag that indicates we have service data.
 	m_serviceDataUUID = uuid;
 } // setServiceDataUUID
@@ -502,7 +554,7 @@ void BLEAdvertisedDevice::setServiceDataUUID(BLEUUID uuid) {
 void BTAdvertisedDevice::setTXPower(int8_t txPower) {
 	m_txPower     = txPower;
 	m_haveTXPower = true;
-	ESP_LOGD(LOG_TAG, "- txPower: %d", m_txPower);
+	log_d("- txPower: %d", m_txPower);
 } // setTXPower
 
 std::string BTAdvertisedDevice::deviceType(uint32_t major_cod){ // enum esp_bt_cod_major_dev_t
@@ -544,22 +596,27 @@ std::string BTAdvertisedDevice::serviceType(uint32_t service_cod){ // enum esp_b
 std::string BTAdvertisedDevice::toString() {
 	std::stringstream ss;
 	ss << "Name: " << getName() << ", Address: " << getAddress().toString();
-	if (haveAppearance()) {
-		ss << ", appearance: " << getAppearance();
-	}
 	if (haveManufacturerData()) {
-		//char *pHex = BLEUtils::buildHexData(nullptr, (uint8_t*)getManufacturerData().data(), getManufacturerData().length());
-		//ss << ", manufacturer data: " << pHex;
-		//free(pHex);
+		char *pHex = BTUtils::buildHexData(nullptr, (uint8_t*)getManufacturerData().data(), getManufacturerData().length());
+		ss << ", manufacturer data: " << pHex;
+		free(pHex);
 	}
 	if (haveServiceUUID()) {
-		//ss << ", serviceUUID: " << getServiceUUID().toString();
+		ss << ", serviceUUID: " << getServiceUUID().toString();
 	}
 	if (haveTXPower()) {
 		ss << ", txPower: " << (int)getTXPower();
 	}
 	return ss.str();
 } // toString
+
+uint8_t* BTAdvertisedDevice::getPayload() {
+	return m_payload;
+}
+
+void BTAdvertisedDevice::setPayload(uint8_t* payload) {
+	m_payload = payload;
+}
 
 
 

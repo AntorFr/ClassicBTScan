@@ -98,7 +98,7 @@ void BTScan::handleGAPEvent( esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t*
             log_d( "Device found: %s", advertisedAddress.toString().c_str());
 
             advertisedDevice.setAddress(advertisedAddress);
-            advertisedDevice.parseAdvertisement(&param->disc_res);
+            advertisedDevice.parseDiscResult(&param->disc_res);
             advertisedDevice.setScan(this);
 
             if (m_pAdvertisedDeviceCallbacks) {

@@ -23,6 +23,8 @@
 
 #include "BTScan.h"
 #include "BTAddress.h"
+#include "BTUtils.h"
+#include "BTUUID.h"
 
 class BTAdvertisedDevice;
 class BTAdvertisedDeviceCallbacks;
@@ -38,8 +40,7 @@ class BTAdvertisedDevice {
 public:
 	BTAdvertisedDevice();
 
-	BTAddress  getAddress();
-	uint16_t    getAppearance();
+	BTAddress  	getAddress();
 	std::string getManufacturerData();
 	std::string getName();
 	uint32_t 	getCod();
@@ -48,13 +49,13 @@ public:
 	int         getRSSI();
 	BTScan*     getScan();
 	std::string getServiceData();
-	//BTUUID      getServiceDataUUID();
-	//BTUUID      getServiceUUID();
+	BTUUID      getServiceDataUUID();
+	BTUUID      getServiceUUID();
 	int8_t      getTXPower();
+	uint8_t* 	getPayload();
 
 
-	//bool		isAdvertisingService(BLEUUID uuid);
-	bool        haveAppearance();
+	bool		isAdvertisingService(BTUUID uuid);
 	bool        haveManufacturerData();
 	bool        haveName();
 	bool        haveRSSI();
@@ -67,25 +68,27 @@ public:
 
 private:
 	friend class BTScan;
-	void parseAdvertisement(esp_bt_gap_cb_param_t::disc_res_param*  disc_res);
+	void parseDiscResult(esp_bt_gap_cb_param_t::disc_res_param*  disc_res);
 	void setAddress(BTAddress address);
 	void setAdFlag(uint8_t adFlag);
-	void setAppearance(uint16_t appearance);
-	//void setManufacturerData(std::string manufacturerData);
+	void setManufacturerData(std::string manufacturerData);
 	void setName(std::string name);
 	void setRSSI(int8_t rssi);
 	void setScan(BTScan* pScan);
 	void setServiceData(std::string data);
+	void setServiceUUID(const char* serviceUUID);
+	void setServiceUUID(BTUUID serviceUUID);
 	void setTXPower(int8_t txPower);
 	void setCod(uint32_t cod);
+	void setPayload(uint8_t* payload);
 
 	bool get_name_from_eir(uint8_t *eir, uint8_t *bdname, uint8_t *bdname_len);
+	void parseEir(uint8_t* payload);
 
 	std::string deviceType(uint32_t major_cod);
 	std::string serviceType(uint32_t service_cod);
 
 
-	bool m_haveAppearance;
 	bool m_haveManufacturerData;
 	bool m_haveName;
 	bool m_haveRSSI;
@@ -97,7 +100,6 @@ private:
 
 	BTAddress   m_address = BTAddress((uint8_t*)"\0\0\0\0\0\0");
 	uint8_t     m_adFlag;
-	uint16_t    m_appearance;
 	std::string m_manufacturerData;
 	std::string m_name;
 	BTScan*     m_pScan;
@@ -111,6 +113,10 @@ private:
 	std::string m_serviceData;
 	std::string m_deviceType;
 	std::string m_serviceType;
+	std::vector<BTUUID> m_serviceUUIDs;
+	BTUUID     m_serviceDataUUID;
+	uint8_t*	m_payload;
+	
 
 };
 
