@@ -276,13 +276,13 @@ void BTAdvertisedDevice::parseDiscResult(esp_bt_gap_cb_param_t::disc_res_param* 
 			}
 			case ESP_BT_GAP_DEV_PROP_EIR: {
 				memcpy(eir, (uint8_t *)(p->val), p->len);
-				//parseEir((uint8_t*)p->val);
+				eir_len = p->len;
 				
 				//#ifndef WiFi_h //wait for Arduino IDF update to properly work with wifi > https://github.com/espressif/arduino-esp32/issues/1997
 				parseEir(eir);
 				//#endif
 				
-				eir_len = p->len;
+
 				break;
 			}
 			default:{
