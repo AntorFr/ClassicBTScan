@@ -61,6 +61,8 @@ class BTScan
     bool           start(uint32_t duration, void (*scanCompleteCB)(BTScanResults));
     BTScanResults  start(uint32_t duration);
     void           stop();
+    BTScanResults getResults();
+    void			clearResults();
 
   private:
     BTScan();

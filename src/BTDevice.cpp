@@ -195,7 +195,6 @@ bool       BT_initialized          = false;   // Have we been initialized?
 	esp_bt_gap_cb_param_t *param) {
 
     /*
-
 	if (BLEDevice::m_pServer != nullptr) {
 		BLEDevice::m_pServer->handleGAPEvent(event, param);
 	}
@@ -235,12 +234,12 @@ bool       BT_initialized          = false;   // Have we been initialized?
  * try and release/delete it.
  */
 /* STATIC */ BTScan* BTDevice::getScan() {
-	//log_d(">> getScan");
+	log_d(">> getScan");
 	if (m_pScan == nullptr) {
 		m_pScan = new BTScan();
-		//log_d(" - creating a new scan object");
+		log_d(" - creating a new scan object");
 	}
-	//log_d("<< getScan: Returning object at 0x%x", (uint32_t)m_pScan);
+	log_d("<< getScan: Returning object at 0x%x", (uint32_t)m_pScan);
 	return m_pScan;
 } // getScan
 

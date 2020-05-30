@@ -25,6 +25,8 @@
 #include "esp_gap_bt_api.h"
 #include "esp_bt_device.h"
 #include <esp_log.h>
+#include <algorithm>
+#include "GeneralUtils.h" 
 
 #if defined(CONFIG_BT_ENABLED) && defined(CONFIG_BLUEDROID_ENABLED)
 
@@ -89,6 +91,7 @@ void BTScan::handleGAPEvent( esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t*
             }
             if (found && !m_wantDuplicates) {  // If we found a previous entry AND we don't want duplicates, then we are done.
                 log_d("Ignoring %s, already seen it.", advertisedAddress.toString().c_str());
+                vTaskDelay(1);
                 break;
             }
 
@@ -173,7 +176,15 @@ bool BTScan::start(uint32_t duration, void (*scanCompleteCB)(BTScanResults)) {
 
     /* start to discover nearby Bluetooth devices */
     log_i("start to discover nearby Bluetooth devices");
-    esp_bt_gap_start_discovery(ESP_BT_INQ_MODE_GENERAL_INQUIRY, (uint8_t)round(0.78*duration), 0);
+
+    uint8_t scan_duration =  std::max(static_cast<int>(round(0.78*duration)),10);
+
+    esp_err_t errRc = esp_bt_gap_start_discovery(ESP_BT_INQ_MODE_GENERAL_INQUIRY, scan_duration, 0);
+    if (errRc != ESP_OK) {
+	    log_e("esp_ble_gap_set_scan_params: err: %d, text: %s", errRc, GeneralUtils::errorToString(errRc));
+		m_semaphoreScanEnd.give();
+		return false;
+	}
 
 	log_d("<< start()");
 	return true;
@@ -240,5 +251,15 @@ BTAdvertisedDevice BTScanResults::getDevice(uint32_t i) {
 	return m_vectorAdvertisedDevices.at(i);
 }
 
+BTScanResults BTScan::getResults() {
+	return m_scanResults;
+}
+
+void BTScan::clearResults() {
+	//for(auto _dev : m_scanResults.m_vectorAdvertisedDevices){
+	//	delete _dev.second;
+	//}
+	m_scanResults.m_vectorAdvertisedDevices.clear();
+}
 
 #endif
