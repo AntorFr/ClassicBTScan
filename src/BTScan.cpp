@@ -177,7 +177,7 @@ bool BTScan::start(uint32_t duration, void (*scanCompleteCB)(BTScanResults)) {
     /* start to discover nearby Bluetooth devices */
     log_i("start to discover nearby Bluetooth devices");
 
-    uint8_t scan_duration =  std::max(static_cast<int>(round(0.78*duration)),10);
+    uint8_t scan_duration =  std::min(static_cast<int>(round(0.78*duration)),10);
 
     esp_err_t errRc = esp_bt_gap_start_discovery(ESP_BT_INQ_MODE_GENERAL_INQUIRY, scan_duration, 0);
     if (errRc != ESP_OK) {

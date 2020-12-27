@@ -61,6 +61,18 @@
         "cmath": "cpp",
         "complex": "cpp",
         "optional": "cpp",
-        "unordered_map": "cpp"
+        "unordered_map": "cpp",
+        "clocale": "cpp",
+        "deque": "cpp",
+        "fstream": "cpp",
+        "iostream": "cpp",
+        "list": "cpp",
+        "numeric": "cpp",
+        "queue": "cpp",
+        "random": "cpp",
+        "set": "cpp",
+        "stack": "cpp",
+        "*.tcc": "cpp",
+        "cinttypes": "cpp"
     }
 }
